@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Monthly planner</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#C9B8ED">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Monthly Planner">
+<link rel="icon" href="/icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Dancing+Script:wght@600;700&family=Patrick+Hand&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --bg: #FFFFFF;
+    --ink: #4A4658;
+    --ink-soft: #8B87A0;
+    --ink-faint: #C4C0D4;
+    --line: #ECE9F4;
+
+    --lavender: #E6DFF6;
+    --lavender-deep: #C9B8ED;
+    --pink: #FBDCE6;
+    --pink-deep: #F3A9C2;
+    --mint: #DBF2E3;
+    --mint-deep: #9FDCB6;
+    --yellow: #FBF3CE;
+    --yellow-deep: #F0DD8A;
+    --blue: #DCEBFA;
+    --blue-deep: #A8CDF0;
+    --peach: #FCE3D6;
+    --peach-deep: #F5B98E;
+    --gray: #F1EFF6;
+    --gray-deep: #B7B2C6;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Patrick Hand', 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    padding: 30px 16px 60px;
+  }
+  .wrap{ max-width: 1100px; margin: 0 auto; }
+
+  /* header */
+  .app-header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 14px;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 14px;
+  }
+  .title-block{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  h1{
+    font-family:'Playfair Display', serif; font-weight:700; font-size:34px;
+    letter-spacing: 3px; color: var(--ink);
+  }
+  .cursive{
+    font-family:'Dancing Script', cursive; font-weight:700; font-size:38px;
+    color: var(--pink-deep); margin-left:2px;
+  }
+  .subtitle{ font-size:14px; color:var(--ink-soft); letter-spacing:.5px; width:100%; margin-top:2px;}
+
+  .month-nav{ display:flex; align-items:center; gap:10px; }
+  .month-nav button{
+    background: var(--lavender); border:none; color: var(--ink);
+    width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+    transition: background .15s, transform .1s;
+  }
+  .month-nav button:hover{ background: var(--lavender-deep); transform: scale(1.06); }
+  .month-label{
+    font-family:'Playfair Display', serif; font-weight:600; font-size:18px; min-width:130px; text-align:center;
+  }
+
+  /* view tabs */
+  .view-tabs{ display:flex; gap:8px; margin: 16px 0 20px; }
+  .view-tab{
+    background: none; border:1.5px solid var(--line); color: var(--ink-soft);
+    padding: 7px 16px; border-radius: 20px; cursor:pointer; font-size:13.5px;
+    font-family:'Noto Sans TC',sans-serif; font-weight:500;
+    display:flex; align-items:center; gap:6px; transition: all .15s;
+  }
+  .view-tab:hover{ border-color: var(--lavender-deep); }
+  .view-tab.active{ background: var(--ink); border-color: var(--ink); color:#fff; }
+
+  /* layout */
+  .layout{ display:grid; grid-template-columns: 1.55fr 1fr; gap: 22px; align-items:start; }
+  @media (max-width: 800px){ .layout{ grid-template-columns: 1fr; } }
+  .hidden{ display:none !important; }
+
+  .card{
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 10px 26px -18px rgba(74,70,88,0.35);
+  }
+
+  /* calendar */
+  .weekdays{ display:grid; grid-template-columns: repeat(7,1fr); gap:5px; margin-bottom:8px; }
+  .weekdays span{
+    text-align:center; font-size:12px; font-weight:700; letter-spacing:1.5px; padding:7px 0;
+    border-radius:9px; color: var(--ink); font-family:'Noto Sans TC',sans-serif;
+  }
+  .weekdays span:nth-child(1){ background: var(--lavender); }
+  .weekdays span:nth-child(2){ background: var(--yellow); }
+  .weekdays span:nth-child(3){ background: var(--pink); }
+  .weekdays span:nth-child(4){ background: var(--mint); }
+  .weekdays span:nth-child(5){ background: var(--blue); }
+  .weekdays span:nth-child(6){ background: var(--lavender); }
+  .weekdays span:nth-child(7){ background: var(--mint); }
+
+  .grid{ display:grid; grid-template-columns: repeat(7,1fr); gap:5px; }
+  .day-cell{
+    position:relative;
+    min-height: 132px;
+    border-radius:10px;
+    padding: 6px 6px 5px;
+    cursor:pointer;
+    border:1.5px solid var(--line);
+    background: #fff;
+    transition: background .15s, border-color .15s, transform .1s;
+    display:flex; flex-direction:column;
+  }
+  .day-cell.pad{ visibility:hidden; border:none; }
+  .day-cell:hover{ border-color: var(--lavender-deep); }
+  .day-cell.selected{ border-color: var(--ink); background: var(--lavender); }
+  .day-cell.today .num{
+    background: var(--peach-deep); color:#fff; border-radius:50%;
+    width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+  }
+  .num{ font-size:12.5px; font-weight:700; color:var(--ink); align-self:flex-start; font-family:'Noto Sans TC',sans-serif; }
+  .day-cell.other-month .num{ color: var(--ink-faint); }
+  .mini-tasks{ margin-top:4px; display:flex; flex-direction:column; gap:2px; }
+  .mini-task{
+    font-size:10.5px; line-height:1.3; padding:2px 4px; border-radius:4px;
+    white-space:normal; word-break:break-word;
+  }
+  .mini-more{ font-size:9.5px; color: var(--ink-soft); padding-left:4px; }
+  .stamp-mini{
+    position:absolute; top:3px; right:4px; font-size:12px;
+  }
+
+  /* side panels */
+  .panel-title{
+    font-family:'Playfair Display', serif; font-weight:700; font-size:17px;
+    display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  }
+  .panel-title .chip{
+    width:10px; height:10px; border-radius:3px; display:inline-block; transform: rotate(6deg);
+  }
+  .todo-panel .panel-title .chip{ background: var(--lavender-deep); }
+  .notes-panel .panel-title .chip{ background: var(--yellow-deep); }
+
+  .selected-date{
+    font-size:14px; color:var(--ink-soft); margin-bottom:10px; letter-spacing:.3px;
+    font-family:'Noto Sans TC',sans-serif;
+  }
+
+  .task-list{ display:flex; flex-direction:column; gap:8px; margin-bottom: 12px;}
+  .task-item{
+    display:flex; align-items:flex-start; gap:9px;
+    padding:9px 10px; border-radius:9px; border:1px dashed var(--line);
+  }
+  .task-item.done{ opacity:0.55; }
+  .checkbox{
+    width:26px; height:26px; border-radius:7px; border:2.5px solid var(--ink);
+    flex-shrink:0; cursor:pointer; margin-top:1px;
+    display:flex; align-items:center; justify-content:center;
+    background:#fff; position:relative; transition: background .12s, transform .1s;
+    padding:0; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .checkbox:active{ transform: scale(0.9); }
+  .checkbox.checked{ background: var(--ink); border-color: var(--ink); }
+  .checkbox.checked::after{
+    content:"✓"; color:#fff; font-size:16px; font-weight:700; line-height:1;
+  }
+  .task-text{ flex:1; }
+  .task-title{ font-size:15.5px; line-height:1.35; }
+  .task-title.done{ text-decoration: line-through; color: var(--ink-faint); }
+  .task-note{ font-size:12.5px; color: var(--ink-soft); margin-top:2px; font-family:'Noto Sans TC',sans-serif;}
+  .task-del{
+    background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15px; padding:2px 4px;
+    flex-shrink:0;
+  }
+  .task-del:hover{ color: var(--pink-deep); }
+  .empty-hint{ font-size:13.5px; color: var(--ink-faint); padding: 6px 2px 10px; font-family:'Noto Sans TC',sans-serif;}
+
+  /* add form */
+  .add-row{ display:flex; gap:6px; }
+  input[type=text]{
+    font-family:'Noto Sans TC',sans-serif;
+    border:1.5px solid var(--line); background:#fff; border-radius:8px;
+    padding:9px 11px; font-size:13.5px; color:var(--ink); outline:none;
+  }
+  input[type=text]:focus{ border-color: var(--lavender-deep); }
+  .add-row input[type=text]{ flex:1; }
+  .add-btn{
+    background: var(--ink); color:#fff; border:none; border-radius:8px;
+    padding:0 16px; font-size:13.5px; cursor:pointer; font-weight:500;
+    transition: opacity .15s; font-family:'Noto Sans TC',sans-serif;
+  }
+  .add-btn:hover{ opacity:0.82; }
+
+  /* sticky note */
+  .sticky-wrap{
+    background: var(--yellow);
+    border-radius: 12px;
+    padding: 14px 16px 12px;
+    transform: rotate(-0.6deg);
+    box-shadow: 0 8px 18px -12px rgba(74,70,88,0.4);
+    position:relative;
+  }
+  .sticky-wrap::before{
+    content:"";
+    position:absolute; top:-8px; left:50%; transform:translateX(-50%) rotate(3deg);
+    width:34px; height:16px; background: rgba(255,255,255,0.55);
+    border:1px solid rgba(0,0,0,0.05);
+  }
+  #stickyNote{
+    width:100%; min-height: 220px; resize: vertical;
+    background: transparent; border:none; outline:none;
+    font-family:'Patrick Hand', 'Noto Sans TC', sans-serif;
+    font-size: 16px; line-height: 1.8; color: var(--ink);
+    background-image: repeating-linear-gradient(to bottom, transparent, transparent 31px, rgba(74,70,88,0.14) 32px);
+  }
+  .sticky-status{
+    font-size: 11px; color: var(--ink-soft); text-align:right; margin-top:4px;
+    font-family:'Noto Sans TC',sans-serif; height:14px;
+  }
+
+  ::selection{ background: var(--pink); }
+
+  /* toast */
+  .toast{
+    position:fixed; left:50%; bottom:28px; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color:#fff; padding:10px 18px; border-radius:10px;
+    font-size:13px; font-family:'Noto Sans TC',sans-serif; opacity:0; pointer-events:none;
+    transition: opacity .2s, transform .2s; z-index:200; box-shadow:0 10px 24px -10px rgba(0,0,0,0.4);
+    max-width: 86vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+
+  /* enlarged day modal */
+  .day-modal-overlay{
+    position:fixed; inset:0; background: rgba(74,70,88,0.38);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    z-index:100; opacity:0; pointer-events:none; transition: opacity .18s;
+  }
+  .day-modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .day-modal{
+    background:#fff; border-radius:20px; padding:26px; width:100%; max-width:460px;
+    max-height:85vh; overflow-y:auto;
+    box-shadow: 0 24px 60px -20px rgba(74,70,88,0.5);
+    transform: scale(0.9) translateY(10px); transition: transform .18s;
+  }
+  .day-modal-overlay.show .day-modal{ transform: scale(1) translateY(0); }
+  .day-modal-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
+  .modal-date-big{
+    font-family:'Playfair Display', serif; font-weight:700; font-size:30px; line-height:1.1;
+  }
+  .modal-date-sub{ font-size:13px; color:var(--ink-soft); margin-top:4px; font-family:'Noto Sans TC',sans-serif; }
+  .modal-close{
+    background: var(--lavender); border:none; width:32px; height:32px; border-radius:50%;
+    cursor:pointer; font-size:15px; color:var(--ink); flex-shrink:0;
+  }
+  .modal-close:hover{ background: var(--lavender-deep); }
+
+  /* color rotation helpers for tasks */
+  .c0{ background: var(--lavender); }
+  .c1{ background: var(--pink); }
+  .c2{ background: var(--mint); }
+  .c3{ background: var(--yellow); }
+  .c4{ background: var(--blue); }
+  .c5{ background: var(--peach); }
+
+  /* categories */
+  .cat-manager{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .cat-chip{
+    display:flex; align-items:center; gap:5px; padding:4px 9px 4px 7px; border-radius:14px;
+    font-size:12px; font-family:'Noto Sans TC',sans-serif; color:var(--ink);
+  }
+  .cat-chip .dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .cat-chip .cat-del{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:11px; padding:0 0 0 2px; line-height:1;
+  }
+  .cat-chip .cat-del:hover{ color: var(--pink-deep); }
+  .cat-add-btn{
+    background:none; border:1.5px dashed var(--ink-faint); color:var(--ink-soft); cursor:pointer;
+    font-size:12px; padding:4px 10px; border-radius:14px; font-family:'Noto Sans TC',sans-serif;
+  }
+  .cat-add-btn:hover{ border-color: var(--lavender-deep); color:var(--ink); }
+  .cat-add-form{ display:none; flex-direction:column; gap:8px; margin-bottom:10px; padding:10px; background:var(--gray); border-radius:10px; }
+  .cat-add-form.show{ display:flex; }
+  .cat-add-form input[type=text]{ width:100%; }
+  .cat-swatches{ display:flex; gap:6px; flex-wrap:wrap; }
+  .cat-swatch{
+    width:24px; height:24px; border-radius:50%; cursor:pointer; border:2.5px solid transparent; padding:0;
+  }
+  .cat-swatch.selected{ border-color: var(--ink); }
+  .cat-add-actions{ display:flex; gap:6px; justify-content:flex-end; }
+  .cat-add-actions button{
+    font-family:'Noto Sans TC',sans-serif; font-size:12.5px; border:none; border-radius:7px; padding:6px 12px; cursor:pointer;
+  }
+  .cat-cancel-btn{ background:#fff; color:var(--ink-soft); }
+  .cat-confirm-btn{ background:var(--ink); color:#fff; }
+
+  .task-cat-select{
+    font-family:'Noto Sans TC',sans-serif; font-size:11.5px; color:var(--ink);
+    border:none; background:rgba(255,255,255,0.65); border-radius:6px; padding:2px 5px;
+    margin-top:4px; outline:none; cursor:pointer;
+  }
+  .add-row .task-cat-select{ margin-top:0; flex-shrink:0; max-width:88px; }
+  .task-edit{
+    background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:13px; padding:2px 4px;
+    flex-shrink:0;
+  }
+  .task-edit:hover{ color: var(--ink); }
+  .task-title-input{
+    width:100%; font-family:'Patrick Hand','Noto Sans TC',sans-serif; font-size:15.5px;
+    border:1.5px solid var(--ink); border-radius:6px; padding:3px 6px; outline:none; background:#fff;
+  }
+
+  /* account bar */
+  .account-bar{ display:flex; align-items:center; gap:8px; }
+  .account-email{
+    font-size:12px; color:var(--ink-soft); font-family:'Noto Sans TC',sans-serif;
+    max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .icon-btn{
+    background: var(--lavender); border:none; color: var(--ink);
+    width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:15px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition: background .15s, transform .1s;
+  }
+  .icon-btn:hover{ background: var(--lavender-deep); }
+  .icon-btn:active{ transform: scale(0.92); }
+
+  /* auth screen */
+  .auth-overlay{
+    position:fixed; inset:0; background: var(--bg);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    z-index:300;
+  }
+  .auth-card{
+    width:100%; max-width:360px; background:#fff; border:1px solid var(--line);
+    border-radius:20px; padding:30px 26px; box-shadow: 0 20px 50px -20px rgba(74,70,88,0.35);
+    text-align:center;
+  }
+  .auth-card h1{ font-size:28px; letter-spacing:2px; }
+  .auth-card .cursive{ font-size:32px; }
+  .auth-sub{ font-size:13px; color:var(--ink-soft); margin:6px 0 22px; font-family:'Noto Sans TC',sans-serif; }
+  .auth-tabs{ display:flex; gap:8px; margin-bottom:18px; }
+  .auth-tab{
+    flex:1; background: var(--gray); border:none; color:var(--ink-soft);
+    padding:8px 0; border-radius: 20px; cursor:pointer; font-size:13.5px;
+    font-family:'Noto Sans TC',sans-serif; font-weight:500;
+  }
+  .auth-tab.active{ background: var(--ink); color:#fff; }
+  .auth-form{ display:flex; flex-direction:column; gap:10px; text-align:left; }
+  .auth-form label{ font-size:12px; color:var(--ink-soft); font-family:'Noto Sans TC',sans-serif; }
+  .auth-form input[type=email], .auth-form input[type=password]{
+    width:100%; padding:11px 12px; font-size:14.5px;
+  }
+  .auth-submit-btn{
+    background: var(--ink); color:#fff; border:none; border-radius:8px;
+    padding:12px 0; font-size:14.5px; cursor:pointer; font-weight:500; margin-top:6px;
+    font-family:'Noto Sans TC',sans-serif; transition: opacity .15s;
+  }
+  .auth-submit-btn:hover{ opacity:0.85; }
+  .auth-submit-btn:disabled{ opacity:0.5; cursor:default; }
+  .auth-msg{
+    margin-top:12px; font-size:12.5px; font-family:'Noto Sans TC',sans-serif;
+    min-height:16px; color: var(--pink-deep);
+  }
+  .auth-msg.ok{ color: var(--mint-deep); }
+
+</style>
+</head>
+<body>
+
+<!-- login / signup screen -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <h1>MONTHLY <span class="cursive">Planner</span></h1>
+    <div class="auth-sub">登入後即可在任何裝置查看同一份待辦資料</div>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="authTabLogin">登入</button>
+      <button type="button" class="auth-tab" id="authTabSignup">建立新帳號</button>
+    </div>
+    <div class="auth-form">
+      <div>
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div>
+        <label for="authPassword">密碼（至少 6 碼）</label>
+        <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="button" class="auth-submit-btn" id="authSubmitBtn">登入</button>
+    </div>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="appWrap">
+
+  <div class="app-header">
+    <div class="title-block">
+      <h1>MONTHLY</h1>
+      <span class="cursive">Planner</span>
+      <div class="subtitle">自由新增 · 完成打勾 ✓ · 便條紙隨手記</div>
+    </div>
+    <div class="month-nav" id="monthNavWrap">
+      <button id="prevMonth">‹</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button id="nextMonth">›</button>
+    </div>
+    <div class="account-bar">
+      <span class="account-email" id="accountEmail"></span>
+      <button type="button" class="icon-btn" id="refreshBtn" title="重新整理同步">⟳</button>
+      <button type="button" class="icon-btn" id="logoutBtn" title="登出">⎋</button>
+    </div>
+  </div>
+
+  <div class="view-tabs">
+    <button class="view-tab active" id="tabCalendar">📅 月曆檢視</button>
+    <button class="view-tab" id="tabDetail">📝 待辦分類細項</button>
+  </div>
+
+  <!-- calendar view -->
+  <div id="calendarView">
+    <div class="card">
+      <div class="weekdays">
+        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+      </div>
+      <div class="grid" id="calGrid"></div>
+    </div>
+  </div>
+
+  <!-- todo detail view -->
+  <div id="detailView" class="hidden">
+    <div class="layout">
+      <div class="card todo-panel">
+        <div class="panel-title"><span class="chip"></span>當日待辦</div>
+        <div class="cat-manager" id="catManager"></div>
+        <div class="cat-add-form" id="catAddForm">
+          <input type="text" id="catNameInput" placeholder="類別名稱，例如：直播">
+          <div class="cat-swatches" id="catSwatches"></div>
+          <div class="cat-add-actions">
+            <button type="button" class="cat-cancel-btn" id="catCancelBtn">取消</button>
+            <button type="button" class="cat-confirm-btn" id="catConfirmBtn">新增類別</button>
+          </div>
+        </div>
+        <div class="selected-date" id="selectedDateLabel"></div>
+        <div class="task-list" id="taskList"></div>
+        <div class="add-row">
+          <select class="task-cat-select" id="newTaskCat"></select>
+          <input type="text" id="newTaskInput" placeholder="新增這天的待辦事項…">
+          <button class="add-btn" id="addTaskBtn">新增</button>
+        </div>
+      </div>
+
+      <div class="card notes-panel">
+        <div class="panel-title"><span class="chip"></span>便條紙</div>
+        <div class="sticky-wrap">
+          <textarea id="stickyNote" placeholder="想到什麼就寫下來…"></textarea>
+        </div>
+        <div class="sticky-status" id="stickyStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="day-modal-overlay" id="dayModalOverlay">
+    <div class="day-modal">
+      <div class="day-modal-head">
+        <div>
+          <div class="modal-date-big" id="modalDateBig"></div>
+          <div class="modal-date-sub" id="modalDateSub"></div>
+        </div>
+        <button class="modal-close" id="modalCloseBtn">✕</button>
+      </div>
+      <div class="task-list" id="modalTaskList"></div>
+      <div class="add-row">
+        <select class="task-cat-select" id="modalNewTaskCat"></select>
+        <input type="text" id="modalNewTaskInput" placeholder="新增這天的待辦事項…">
+        <button class="add-btn" id="modalAddTaskBtn">新增</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Supabase client & auth ---------- */
+const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+let currentUser = null;
+
+const CATEGORY_PALETTE = ['lavender','pink','mint','yellow','blue','peach','gray'];
+const DEFAULT_CATEGORIES = [
+  { id:'c-meeting', label:'會議', color:'lavender' },
+  { id:'c-course', label:'課程', color:'blue' },
+  { id:'c-work', label:'工作', color:'pink' },
+  { id:'c-life', label:'生活', color:'mint' },
+  { id:'c-other', label:'其他', color:'gray' },
+];
+let data = { custom: {}, note: '', categories: [] };
+let current = new Date();
+let selectedDate = fmt(new Date());
+let pendingCatColor = CATEGORY_PALETTE[0];
+
+function fmt(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function categoryMeta(id){
+  return data.categories.find(c=>c.id===id) || data.categories[data.categories.length-1] || DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length-1];
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+
+async function loadData(){
+  const uid = currentUser.id;
+  try{
+    const [tasksRes, catsRes, noteRes] = await Promise.all([
+      supabase.from('tasks').select('*').eq('user_id', uid),
+      supabase.from('categories').select('*').eq('user_id', uid).order('created_at', { ascending: true }),
+      supabase.from('notes').select('*').eq('user_id', uid).maybeSingle()
+    ]);
+    if(tasksRes.error) throw tasksRes.error;
+    if(catsRes.error) throw catsRes.error;
+    if(noteRes.error) throw noteRes.error;
+
+    const custom = {};
+    (tasksRes.data || []).forEach(row=>{
+      if(!custom[row.date]) custom[row.date] = [];
+      custom[row.date].push({ id: row.id, title: row.title, status: row.status, category: row.category_id });
+    });
+    let categories = (catsRes.data || []).map(row=>({ id: row.id, label: row.label, color: row.color }));
+    if(!categories.length) categories = DEFAULT_CATEGORIES.map(c=>({...c}));
+
+    data = { custom, note: (noteRes.data && noteRes.data.content) || '', categories };
+  }catch(e){
+    console.error('loadData failed', e);
+    showToast('⚠️ 讀取資料失敗，請檢查網路連線或稍後重新整理');
+  }
+}
+
+function tasksForDate(dateStr){
+  return (data.custom[dateStr]||[]).map(c=>({...c, type:'custom'}));
+}
+function isDone(dateStr, taskId){
+  const list = data.custom[dateStr]||[];
+  const t = list.find(x=>x.id===taskId);
+  return t ? t.status === 'done' : false;
+}
+function setTaskStatus(dateStr, taskId, status){
+  const list = data.custom[dateStr]||[];
+  const t = list.find(x=>x.id===taskId);
+  if(!t) return;
+  t.status = status;
+}
+
+function renderMonthLabel(){
+  document.getElementById('monthLabel').textContent =
+    current.getFullYear() + ' 年 ' + (current.getMonth()+1) + ' 月';
+}
+
+function renderCalendar(){
+  renderMonthLabel();
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const year = current.getFullYear(), month = current.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayStr = fmt(new Date());
+
+  for(let i=0;i<startOffset;i++){
+    const pad = document.createElement('div');
+    pad.className = 'day-cell pad';
+    grid.appendChild(pad);
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const dateObj = new Date(year, month, day);
+    const dateStr = fmt(dateObj);
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    if(dateStr === todayStr) cell.classList.add('today');
+    if(dateStr === selectedDate) cell.classList.add('selected');
+
+    const num = document.createElement('div');
+    num.className = 'num';
+    num.textContent = day;
+    cell.appendChild(num);
+
+    const tasks = tasksForDate(dateStr);
+    if(tasks.length){
+      const wrapMini = document.createElement('div');
+      wrapMini.className = 'mini-tasks';
+      tasks.forEach(t=>{
+        const mini = document.createElement('div');
+        mini.className = 'mini-task';
+        mini.style.background = 'var(--' + categoryMeta(t.category).color + ')';
+        mini.textContent = t.title;
+        wrapMini.appendChild(mini);
+      });
+      cell.appendChild(wrapMini);
+
+      const allDone = tasks.every(t=>isDone(dateStr, t.id));
+      if(allDone){
+        const stamp = document.createElement('div');
+        stamp.className = 'stamp-mini';
+        stamp.textContent = '🌸';
+        cell.appendChild(stamp);
+      }
+    }
+    cell.addEventListener('click', ()=>{
+      selectedDate = dateStr;
+      renderCalendar();
+      renderTaskList();
+      openDayModal();
+    });
+    grid.appendChild(cell);
+  }
+}
+
+async function toggleTaskDone(t){
+  const newStatus = isDone(selectedDate, t.id) ? 'todo' : 'done';
+  setTaskStatus(selectedDate, t.id, newStatus);
+  refreshAll();
+  const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', t.id);
+  if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
+}
+async function deleteCustomTask(dateStr, t){
+  data.custom[dateStr] = (data.custom[dateStr]||[]).filter(x=>x.id!==t.id);
+  refreshAll();
+  const { error } = await supabase.from('tasks').delete().eq('id', t.id);
+  if(error){ console.error(error); showToast('⚠️ 刪除同步失敗，請檢查網路'); }
+}
+
+async function updateTaskTitle(dateStr, taskId, newTitle){
+  const list = data.custom[dateStr]||[];
+  const t = list.find(x=>x.id===taskId);
+  if(!t) return;
+  t.title = newTitle;
+  refreshAll();
+  const { error } = await supabase.from('tasks').update({ title: newTitle }).eq('id', taskId);
+  if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
+}
+async function updateTaskCategory(dateStr, taskId, categoryId){
+  const list = data.custom[dateStr]||[];
+  const t = list.find(x=>x.id===taskId);
+  if(!t) return;
+  t.category = categoryId;
+  refreshAll();
+  const { error } = await supabase.from('tasks').update({ category_id: categoryId }).eq('id', taskId);
+  if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
+}
+function populateCatSelect(select, currentId){
+  select.innerHTML = '';
+  data.categories.forEach(c=>{
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.label;
+    if(c.id === currentId) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+function attachInlineEdit(titleEl, dateStr, t){
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'task-title-input';
+  input.value = t.title;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+  let finished = false;
+  const finish = async (save)=>{
+    if(finished) return;
+    finished = true;
+    const val = input.value.trim();
+    if(save && val && val !== t.title){
+      await updateTaskTitle(dateStr, t.id, val);
+    }else if(input.parentNode){
+      input.replaceWith(titleEl);
+    }
+  };
+  input.addEventListener('keydown', ev=>{
+    if(ev.key === 'Enter') finish(true);
+    if(ev.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', ()=> finish(true));
+}
+
+function buildTaskItem(t){
+  const done = isDone(selectedDate, t.id);
+  const cat = categoryMeta(t.category);
+  const item = document.createElement('div');
+  item.className = 'task-item' + (done ? ' done' : '');
+  item.style.background = 'var(--' + cat.color + ')';
+  item.style.border = 'none';
+
+  const cb = document.createElement('button');
+  cb.type = 'button';
+  cb.className = 'checkbox' + (done ? ' checked' : '');
+  cb.setAttribute('aria-label', '標記完成');
+  cb.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    toggleTaskDone(t);
+  });
+  item.appendChild(cb);
+
+  const text = document.createElement('div');
+  text.className = 'task-text';
+  const title = document.createElement('div');
+  title.className = 'task-title' + (done ? ' done' : '');
+  title.textContent = t.title;
+  text.appendChild(title);
+
+  const catSelect = document.createElement('select');
+  catSelect.className = 'task-cat-select';
+  populateCatSelect(catSelect, t.category);
+  catSelect.addEventListener('click', e=> e.stopPropagation());
+  catSelect.addEventListener('change', ()=> updateTaskCategory(selectedDate, t.id, catSelect.value));
+  text.appendChild(catSelect);
+
+  item.appendChild(text);
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'task-edit';
+  editBtn.textContent = '✎';
+  editBtn.setAttribute('aria-label', '編輯文字');
+  editBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    attachInlineEdit(title, selectedDate, t);
+  });
+  item.appendChild(editBtn);
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'task-del';
+  del.textContent = '✕';
+  del.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    deleteCustomTask(selectedDate, t);
+  });
+  item.appendChild(del);
+  return item;
+}
+
+function renderTaskListInto(listId){
+  const list = document.getElementById(listId);
+  list.innerHTML = '';
+  const tasks = tasksForDate(selectedDate);
+  if(!tasks.length){
+    const empty = document.createElement('div');
+    empty.className = 'empty-hint';
+    empty.textContent = '這天還沒有待辦事項。';
+    list.appendChild(empty);
+    return;
+  }
+  tasks.forEach(t=> list.appendChild(buildTaskItem(t)));
+}
+
+function renderTaskList(){
+  const d = new Date(selectedDate+'T00:00:00');
+  const weekNames = ['日','一','二','三','四','五','六'];
+  const label = document.getElementById('selectedDateLabel');
+  label.textContent = `${d.getMonth()+1} 月 ${d.getDate()} 日（週${weekNames[d.getDay()]}）`;
+  renderTaskListInto('taskList');
+
+  const modalBig = document.getElementById('modalDateBig');
+  const modalSub = document.getElementById('modalDateSub');
+  if(modalBig){
+    modalBig.textContent = `${d.getMonth()+1} / ${d.getDate()}`;
+    modalSub.textContent = `週${weekNames[d.getDay()]}`;
+    renderTaskListInto('modalTaskList');
+  }
+}
+
+function refreshAll(){
+  renderCalendar();
+  renderTaskList();
+  renderCategoryManager();
+  refreshCatSelects();
+}
+
+/* ---------- category manager ---------- */
+function renderCategoryManager(){
+  const wrap = document.getElementById('catManager');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  data.categories.forEach(c=>{
+    const chip = document.createElement('span');
+    chip.className = 'cat-chip';
+    chip.style.background = 'var(--' + c.color + ')';
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = 'var(--' + c.color + '-deep)';
+    chip.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = c.label;
+    chip.appendChild(label);
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'cat-del';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', async ()=>{
+      if(data.categories.length <= 1){ showToast('至少要保留一個類別'); return; }
+      data.categories = data.categories.filter(x=>x.id!==c.id);
+      refreshAll();
+      const { error } = await supabase.from('categories').delete().eq('id', c.id);
+      if(error){ console.error(error); showToast('⚠️ 刪除類別同步失敗'); }
+    });
+    chip.appendChild(delBtn);
+    wrap.appendChild(chip);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'cat-add-btn';
+  addBtn.textContent = '+ 新增類別';
+  addBtn.addEventListener('click', ()=>{
+    const form = document.getElementById('catAddForm');
+    form.classList.toggle('show');
+    if(form.classList.contains('show')) renderCatSwatches();
+  });
+  wrap.appendChild(addBtn);
+}
+function renderCatSwatches(){
+  const wrap = document.getElementById('catSwatches');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  pendingCatColor = CATEGORY_PALETTE[0];
+  CATEGORY_PALETTE.forEach(color=>{
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'cat-swatch' + (color===pendingCatColor ? ' selected' : '');
+    sw.style.background = 'var(--' + color + '-deep)';
+    sw.addEventListener('click', ()=>{
+      pendingCatColor = color;
+      wrap.querySelectorAll('.cat-swatch').forEach(el=>el.classList.remove('selected'));
+      sw.classList.add('selected');
+    });
+    wrap.appendChild(sw);
+  });
+}
+function refreshCatSelects(){
+  const newCat = document.getElementById('newTaskCat');
+  if(newCat) populateCatSelect(newCat, newCat.value || (data.categories[0]&&data.categories[0].id));
+  const modalCat = document.getElementById('modalNewTaskCat');
+  if(modalCat) populateCatSelect(modalCat, modalCat.value || (data.categories[0]&&data.categories[0].id));
+}
+
+function openDayModal(){
+  document.getElementById('dayModalOverlay').classList.add('show');
+}
+function closeDayModal(){
+  document.getElementById('dayModalOverlay').classList.remove('show');
+}
+
+/* ---------- view switching ---------- */
+function switchView(view){
+  const calView = document.getElementById('calendarView');
+  const detView = document.getElementById('detailView');
+  const tabCal = document.getElementById('tabCalendar');
+  const tabDet = document.getElementById('tabDetail');
+  const navWrap = document.getElementById('monthNavWrap');
+  if(view === 'detail'){
+    calView.classList.add('hidden');
+    detView.classList.remove('hidden');
+    tabCal.classList.remove('active');
+    tabDet.classList.add('active');
+    navWrap.classList.add('hidden');
+    renderTaskList();
+    renderCategoryManager();
+    refreshCatSelects();
+  }else{
+    calView.classList.remove('hidden');
+    detView.classList.add('hidden');
+    tabCal.classList.add('active');
+    tabDet.classList.remove('active');
+    navWrap.classList.remove('hidden');
+  }
+}
+
+// events — each wired independently so one failure can't block the rest
+function on(id, evt, handler){
+  const el = document.getElementById(id);
+  if(!el){ console.error('Element not found for wiring:', id); return; }
+  try{ el.addEventListener(evt, handler); }
+  catch(e){ console.error('Failed to attach listener:', id, e); }
+}
+
+on('tabCalendar', 'click', ()=> switchView('calendar'));
+on('tabDetail', 'click', ()=> switchView('detail'));
+
+on('prevMonth', 'click', ()=>{
+  current = new Date(current.getFullYear(), current.getMonth()-1, 1);
+  renderCalendar();
+});
+on('nextMonth', 'click', ()=>{
+  current = new Date(current.getFullYear(), current.getMonth()+1, 1);
+  renderCalendar();
+});
+
+on('addTaskBtn', 'click', ()=>addCustomTask('newTaskInput','newTaskCat'));
+on('newTaskInput', 'keydown', e=>{ if(e.key==='Enter') addCustomTask('newTaskInput','newTaskCat'); });
+on('modalAddTaskBtn', 'click', ()=>addCustomTask('modalNewTaskInput','modalNewTaskCat'));
+on('modalNewTaskInput', 'keydown', e=>{ if(e.key==='Enter') addCustomTask('modalNewTaskInput','modalNewTaskCat'); });
+async function addCustomTask(inputId, catSelectId){
+  const input = document.getElementById(inputId);
+  const title = input.value.trim();
+  if(!title) return;
+  const catSelect = catSelectId ? document.getElementById(catSelectId) : null;
+  const category = (catSelect && catSelect.value) ? catSelect.value : (data.categories[0] ? data.categories[0].id : null);
+  input.value = '';
+  const { data: inserted, error } = await supabase.from('tasks').insert({
+    user_id: currentUser.id, date: selectedDate, title, status: 'todo', category_id: category
+  }).select().single();
+  if(error){ console.error(error); showToast('❌ 新增失敗，請檢查網路'); return; }
+  if(!data.custom[selectedDate]) data.custom[selectedDate] = [];
+  data.custom[selectedDate].push({ id: inserted.id, title: inserted.title, status: inserted.status, category: inserted.category_id });
+  refreshAll();
+}
+
+on('modalCloseBtn', 'click', closeDayModal);
+on('dayModalOverlay', 'click', (e)=>{
+  if(e.target.id === 'dayModalOverlay') closeDayModal();
+});
+
+on('catCancelBtn', 'click', ()=>{
+  document.getElementById('catAddForm').classList.remove('show');
+  document.getElementById('catNameInput').value = '';
+});
+on('catConfirmBtn', 'click', async ()=>{
+  const nameInput = document.getElementById('catNameInput');
+  const name = nameInput.value.trim();
+  if(!name) return;
+  nameInput.value = '';
+  document.getElementById('catAddForm').classList.remove('show');
+  const { data: inserted, error } = await supabase.from('categories').insert({
+    user_id: currentUser.id, label: name, color: pendingCatColor
+  }).select().single();
+  if(error){ console.error(error); showToast('❌ 新增類別失敗，請檢查網路'); return; }
+  data.categories.push({ id: inserted.id, label: inserted.label, color: inserted.color });
+  refreshAll();
+});
+on('catNameInput', 'keydown', e=>{ if(e.key==='Enter') document.getElementById('catConfirmBtn').click(); });
+
+// sticky note: autosave with debounce
+let noteTimer = null;
+on('stickyNote', 'input', (e)=>{
+  data.note = e.target.value;
+  const statusEl = document.getElementById('stickyStatus');
+  if(statusEl) statusEl.textContent = '儲存中…';
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(async ()=>{
+    const { error } = await supabase.from('notes').upsert({
+      user_id: currentUser.id, content: data.note, updated_at: new Date().toISOString()
+    });
+    if(statusEl) statusEl.textContent = error ? '⚠️ 同步失敗' : '已儲存';
+    if(error) console.error(error);
+    setTimeout(()=>{ if(statusEl && (statusEl.textContent==='已儲存'||statusEl.textContent==='⚠️ 同步失敗')) statusEl.textContent=''; }, 1500);
+  }, 600);
+});
+
+/* ---------- auth ---------- */
+let authMode = 'login';
+function setAuthMode(mode){
+  authMode = mode;
+  document.getElementById('authTabLogin').classList.toggle('active', mode==='login');
+  document.getElementById('authTabSignup').classList.toggle('active', mode==='signup');
+  document.getElementById('authSubmitBtn').textContent = mode==='login' ? '登入' : '建立帳號並登入';
+  document.getElementById('authMsg').textContent = '';
+}
+on('authTabLogin', 'click', ()=> setAuthMode('login'));
+on('authTabSignup', 'click', ()=> setAuthMode('signup'));
+
+on('authSubmitBtn', 'click', async ()=>{
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const msg = document.getElementById('authMsg');
+  const btn = document.getElementById('authSubmitBtn');
+  if(!email || !password){ msg.textContent = '請輸入 Email 與密碼'; msg.className = 'auth-msg'; return; }
+  btn.disabled = true;
+  msg.className = 'auth-msg';
+  msg.textContent = authMode==='login' ? '登入中…' : '建立帳號中…';
+  try{
+    if(authMode === 'login'){
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    }else{
+      const { error } = await supabase.auth.signUp({ email, password });
+      if(error) throw error;
+      msg.className = 'auth-msg ok';
+      msg.textContent = '註冊成功！若需要 Email 驗證，請先到信箱點擊驗證連結，再回來登入。';
+    }
+  }catch(e){
+    msg.className = 'auth-msg';
+    msg.textContent = e.message || '發生錯誤，請再試一次';
+  }finally{
+    btn.disabled = false;
+  }
+});
+['authEmail','authPassword'].forEach(id=>{
+  on(id, 'keydown', e=>{ if(e.key==='Enter') document.getElementById('authSubmitBtn').click(); });
+});
+
+on('logoutBtn', 'click', async ()=>{
+  await supabase.auth.signOut();
+});
+on('refreshBtn', 'click', async ()=>{
+  if(!currentUser) return;
+  showToast('🔄 正在同步最新資料…');
+  await loadData();
+  refreshAll();
+  const noteEl = document.getElementById('stickyNote');
+  if(noteEl && document.activeElement !== noteEl) noteEl.value = data.note || '';
+  showToast('✅ 已同步最新資料');
+});
+
+// re-sync automatically when the app regains focus (e.g. switching back from another app)
+// but never while the person is actively typing, to avoid clobbering an in-progress edit
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState !== 'visible') return;
+  const active = document.activeElement;
+  const isTyping = active && ['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+  if(isTyping || !currentUser) return;
+  loadData().then(()=>{
+    refreshAll();
+    const noteEl = document.getElementById('stickyNote');
+    if(noteEl && document.activeElement !== noteEl) noteEl.value = data.note || '';
+  });
+});
+
+async function boot(){
+  await loadData();
+  renderCalendar();
+  renderTaskList();
+  renderCategoryManager();
+  refreshCatSelects();
+  const noteEl = document.getElementById('stickyNote');
+  if(noteEl) noteEl.value = data.note || '';
+}
+
+function showApp(user){
+  currentUser = user;
+  document.getElementById('authOverlay').classList.add('hidden');
+  document.getElementById('appWrap').classList.remove('hidden');
+  document.getElementById('accountEmail').textContent = user.email || '';
+  boot().catch(e=>console.error('boot failed', e));
+}
+function showAuth(){
+  currentUser = null;
+  document.getElementById('appWrap').classList.add('hidden');
+  document.getElementById('authOverlay').classList.remove('hidden');
+}
+
+supabase.auth.onAuthStateChange((event, session)=>{
+  if(session && session.user) showApp(session.user);
+  else showAuth();
+});
+supabase.auth.getSession().then(({ data: { session } })=>{
+  if(session && session.user) showApp(session.user);
+  else showAuth();
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
