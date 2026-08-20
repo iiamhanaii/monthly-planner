@@ -5,4 +5,4 @@
 // 貼好之後存檔，重新整理網頁即可生效
 // ============================================================
 window.SUPABASE_URL = "https://admkchpmdyswasgsljcz.supabase.co";
-window.SUPABASE_ANON_KEY = "sb_publishable_xyHgdRP44yfngHdIYMfd_Q_R4-c-E4E";
+window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkbWtjaHBtZHlzd2FzZ3NsamN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDczMjEsImV4cCI6MjEwMjcyMzMyMX0.iV3ukn0XWi4cmhJhDCsOo-6sYEXjPli4ok_Spv1Pw9Y";
