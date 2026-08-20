@@ -505,7 +505,7 @@
 
 <script>
 /* ---------- Supabase client & auth ---------- */
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 let currentUser = null;
 
 const CATEGORY_PALETTE = ['lavender','pink','mint','yellow','blue','peach','gray'];
@@ -541,9 +541,9 @@ async function loadData(){
   const uid = currentUser.id;
   try{
     const [tasksRes, catsRes, noteRes] = await Promise.all([
-      supabase.from('tasks').select('*').eq('user_id', uid),
-      supabase.from('categories').select('*').eq('user_id', uid).order('created_at', { ascending: true }),
-      supabase.from('notes').select('*').eq('user_id', uid).maybeSingle()
+      sb.from('tasks').select('*').eq('user_id', uid),
+      sb.from('categories').select('*').eq('user_id', uid).order('created_at', { ascending: true }),
+      sb.from('notes').select('*').eq('user_id', uid).maybeSingle()
     ]);
     if(tasksRes.error) throw tasksRes.error;
     if(catsRes.error) throw catsRes.error;
@@ -647,13 +647,13 @@ async function toggleTaskDone(t){
   const newStatus = isDone(selectedDate, t.id) ? 'todo' : 'done';
   setTaskStatus(selectedDate, t.id, newStatus);
   refreshAll();
-  const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', t.id);
+  const { error } = await sb.from('tasks').update({ status: newStatus }).eq('id', t.id);
   if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
 }
 async function deleteCustomTask(dateStr, t){
   data.custom[dateStr] = (data.custom[dateStr]||[]).filter(x=>x.id!==t.id);
   refreshAll();
-  const { error } = await supabase.from('tasks').delete().eq('id', t.id);
+  const { error } = await sb.from('tasks').delete().eq('id', t.id);
   if(error){ console.error(error); showToast('⚠️ 刪除同步失敗，請檢查網路'); }
 }
 
@@ -663,7 +663,7 @@ async function updateTaskTitle(dateStr, taskId, newTitle){
   if(!t) return;
   t.title = newTitle;
   refreshAll();
-  const { error } = await supabase.from('tasks').update({ title: newTitle }).eq('id', taskId);
+  const { error } = await sb.from('tasks').update({ title: newTitle }).eq('id', taskId);
   if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
 }
 async function updateTaskCategory(dateStr, taskId, categoryId){
@@ -672,7 +672,7 @@ async function updateTaskCategory(dateStr, taskId, categoryId){
   if(!t) return;
   t.category = categoryId;
   refreshAll();
-  const { error } = await supabase.from('tasks').update({ category_id: categoryId }).eq('id', taskId);
+  const { error } = await sb.from('tasks').update({ category_id: categoryId }).eq('id', taskId);
   if(error){ console.error(error); showToast('⚠️ 同步失敗，請檢查網路'); }
 }
 function populateCatSelect(select, currentId){
@@ -832,7 +832,7 @@ function renderCategoryManager(){
       if(data.categories.length <= 1){ showToast('至少要保留一個類別'); return; }
       data.categories = data.categories.filter(x=>x.id!==c.id);
       refreshAll();
-      const { error } = await supabase.from('categories').delete().eq('id', c.id);
+      const { error } = await sb.from('categories').delete().eq('id', c.id);
       if(error){ console.error(error); showToast('⚠️ 刪除類別同步失敗'); }
     });
     chip.appendChild(delBtn);
@@ -937,7 +937,7 @@ async function addCustomTask(inputId, catSelectId){
   const catSelect = catSelectId ? document.getElementById(catSelectId) : null;
   const category = (catSelect && catSelect.value) ? catSelect.value : (data.categories[0] ? data.categories[0].id : null);
   input.value = '';
-  const { data: inserted, error } = await supabase.from('tasks').insert({
+  const { data: inserted, error } = await sb.from('tasks').insert({
     user_id: currentUser.id, date: selectedDate, title, status: 'todo', category_id: category
   }).select().single();
   if(error){ console.error(error); showToast('❌ 新增失敗，請檢查網路'); return; }
@@ -961,7 +961,7 @@ on('catConfirmBtn', 'click', async ()=>{
   if(!name) return;
   nameInput.value = '';
   document.getElementById('catAddForm').classList.remove('show');
-  const { data: inserted, error } = await supabase.from('categories').insert({
+  const { data: inserted, error } = await sb.from('categories').insert({
     user_id: currentUser.id, label: name, color: pendingCatColor
   }).select().single();
   if(error){ console.error(error); showToast('❌ 新增類別失敗，請檢查網路'); return; }
@@ -978,7 +978,7 @@ on('stickyNote', 'input', (e)=>{
   if(statusEl) statusEl.textContent = '儲存中…';
   clearTimeout(noteTimer);
   noteTimer = setTimeout(async ()=>{
-    const { error } = await supabase.from('notes').upsert({
+    const { error } = await sb.from('notes').upsert({
       user_id: currentUser.id, content: data.note, updated_at: new Date().toISOString()
     });
     if(statusEl) statusEl.textContent = error ? '⚠️ 同步失敗' : '已儲存';
@@ -1010,10 +1010,10 @@ on('authSubmitBtn', 'click', async ()=>{
   msg.textContent = authMode==='login' ? '登入中…' : '建立帳號中…';
   try{
     if(authMode === 'login'){
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await sb.auth.signInWithPassword({ email, password });
       if(error) throw error;
     }else{
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await sb.auth.signUp({ email, password });
       if(error) throw error;
       msg.className = 'auth-msg ok';
       msg.textContent = '註冊成功！若需要 Email 驗證，請先到信箱點擊驗證連結，再回來登入。';
@@ -1030,7 +1030,7 @@ on('authSubmitBtn', 'click', async ()=>{
 });
 
 on('logoutBtn', 'click', async ()=>{
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
 });
 on('refreshBtn', 'click', async ()=>{
   if(!currentUser) return;
@@ -1079,11 +1079,11 @@ function showAuth(){
   document.getElementById('authOverlay').classList.remove('hidden');
 }
 
-supabase.auth.onAuthStateChange((event, session)=>{
+sb.auth.onAuthStateChange((event, session)=>{
   if(session && session.user) showApp(session.user);
   else showAuth();
 });
-supabase.auth.getSession().then(({ data: { session } })=>{
+sb.auth.getSession().then(({ data: { session } })=>{
   if(session && session.user) showApp(session.user);
   else showAuth();
 });
