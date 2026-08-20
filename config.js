@@ -5,4 +5,4 @@
 // 貼好之後存檔，重新整理網頁即可生效
 // ============================================================
 window.SUPABASE_URL = "https://admkchpmdyswasgsljcz.supabase.co";
-window.SUPABASE_ANON_KEY = "貼上你的 Publishable key（sb_publishable_ sb_publishable_xyHgdRP44yfngHdIYMfd_Q_R4-c-E4E）";
+window.SUPABASE_ANON_KEY = "PASTE_YOUR_KEY_HERE";
