@@ -136,6 +136,11 @@
   .day-cell.pad{ visibility:hidden; border:none; }
   .day-cell:hover{ border-color: var(--lavender-deep); }
   .day-cell.selected{ border-color: var(--ink); background: var(--lavender); }
+  @media (max-width: 600px){
+    .day-cell{ min-height: 48px; padding: 4px 4px 3px; }
+    .mini-task{ font-size: 9.5px; padding: 1.5px 3px; }
+    .num{ font-size: 11.5px; }
+  }
   .day-cell.today .num{
     background: var(--peach-deep); color:#fff; border-radius:50%;
     width:20px; height:20px; display:flex; align-items:center; justify-content:center;
@@ -346,6 +351,7 @@
   }
   .icon-btn:hover{ background: var(--lavender-deep); }
   .icon-btn:active{ transform: scale(0.92); }
+  .icon-btn.on{ background: var(--mint); }
 
   /* auth screen */
   .auth-overlay{
@@ -429,6 +435,7 @@
     </div>
     <div class="account-bar">
       <span class="account-email" id="accountEmail"></span>
+      <button type="button" class="icon-btn" id="reminderBtn" title="推播提醒設定">🔔</button>
       <button type="button" class="icon-btn" id="refreshBtn" title="重新整理同步">⟳</button>
       <button type="button" class="icon-btn" id="logoutBtn" title="登出">⎋</button>
     </div>
@@ -1042,6 +1049,75 @@ on('refreshBtn', 'click', async ()=>{
   showToast('✅ 已同步最新資料');
 });
 
+/* ---------- push notification reminders ---------- */
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0; i<rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+async function updateReminderButtonState(){
+  const btn = document.getElementById('reminderBtn');
+  if(!btn || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    btn.classList.toggle('on', !!sub);
+    btn.title = sub ? '推播提醒已開啟（點擊關閉）' : '開啟推播提醒';
+  }catch(e){ console.error(e); }
+}
+on('reminderBtn', 'click', async ()=>{
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    showToast('⚠️ 這個瀏覽器不支援推播通知');
+    return;
+  }
+  if(!window.VAPID_PUBLIC_KEY || window.VAPID_PUBLIC_KEY.indexOf('請貼上') === 0){
+    showToast('⚠️ 尚未設定推播金鑰，請完成設定步驟');
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+
+  if(existing){
+    // turn off
+    try{
+      await sb.from('push_subscriptions').delete().eq('endpoint', existing.endpoint);
+      await existing.unsubscribe();
+      showToast('🔕 已關閉推播提醒');
+    }catch(e){ console.error(e); showToast('⚠️ 關閉失敗，請重試'); }
+    updateReminderButtonState();
+    return;
+  }
+
+  // turn on
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){
+    showToast('⚠️ 需要允許通知權限才能開啟提醒');
+    return;
+  }
+  try{
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
+    });
+    const subJson = sub.toJSON();
+    const { error } = await sb.from('push_subscriptions').insert({
+      user_id: currentUser.id,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth
+    });
+    if(error) throw error;
+    showToast('🔔 已開啟每日待辦提醒（早上 8 點）');
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ 開啟提醒失敗，請檢查網路後重試');
+  }
+  updateReminderButtonState();
+});
+
 // re-sync automatically when the app regains focus (e.g. switching back from another app)
 // but never while the person is actively typing, to avoid clobbering an in-progress edit
 document.addEventListener('visibilitychange', ()=>{
@@ -1064,6 +1140,7 @@ async function boot(){
   refreshCatSelects();
   const noteEl = document.getElementById('stickyNote');
   if(noteEl) noteEl.value = data.note || '';
+  updateReminderButtonState();
 }
 
 function showApp(user){
